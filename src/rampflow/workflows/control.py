@@ -127,8 +127,4 @@ class RampWorkflowControl:
         return self._guard(operation_id, "deicing.dispatch.committed", subject, at, action, requirements=requirements)
 
     def publish_apron_movement_safety(self, operation_id: str, subject: str, at: datetime, action: Callable[[], T], requirements: tuple[Decision, ...] = ()) -> OperationReceipt:
-        event = self.stream.publish(operation_id, utc(at), "apron.movement.safety.decided", subject, {"operation_id": operation_id})
-        result = action()
-        receipt = OperationReceipt(operation_id, event.topic, subject, event, result)
-        self._receipts[operation_id] = receipt
-        return receipt
+        return self._guard(operation_id, "apron.movement.safety.decided", subject, at, action, requirements=requirements)

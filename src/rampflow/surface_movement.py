@@ -60,34 +60,27 @@ class SurfaceRouter:
     def _buffered(self,w:Window,seconds:int)->Window:
         d=timedelta(seconds=seconds);return Window(w.start-d,w.end+d)
 
+    def _blockers(self,edge:TaxiEdge,w:Window)->list[Window]:
+        blockers=[c for c in edge.closed_windows if c.overlaps(w)]
+        envelope=self._buffered(w,self.headway_seconds)
+        blockers.extend(u for _,u in self._reservations[edge.edge_id] if envelope.overlaps(u))
+        if edge.opposite_edge:
+            blockers.extend(u for _,u in self._reservations.get(edge.opposite_edge,()) if envelope.overlaps(u))
+        if edge.crossing_group:
+            cross=self._buffered(w,self.crossing_headway_seconds)
+            for other in self.edges.values():
+                if other.edge_id!=edge.edge_id and other.crossing_group==edge.crossing_group:
+                    blockers.extend(u for _,u in self._reservations[other.edge_id] if cross.overlaps(u))
+        return blockers
+
     def _edge_free(self, edge: TaxiEdge, w: Window) -> bool:
-        if any(c.overlaps(w) for c in edge.closed_windows):
-            return False
-        envelope = self._buffered(w, self.headway_seconds)
-        direct_conflicts = [
-            used
-            for _, used in self._reservations[edge.edge_id]
-            if envelope.overlaps(used)
-        ]
-        if direct_conflicts:
-            return False
-        return True
+        return not self._blockers(edge,w)
 
     def _next_free(self,edge:TaxiEdge,start:datetime)->Window:
         start=utc(start);dur=timedelta(seconds=edge.travel_seconds)
         for _ in range(1000):
             w=Window(start,start+dur)
-            blockers=[]
-            blockers.extend(c for c in edge.closed_windows if c.overlaps(w))
-            envelope=self._buffered(w,self.headway_seconds)
-            blockers.extend(u for _,u in self._reservations[edge.edge_id] if envelope.overlaps(u))
-            if edge.opposite_edge:
-                blockers.extend(u for _,u in self._reservations.get(edge.opposite_edge,()) if envelope.overlaps(u))
-            if edge.crossing_group:
-                cross=self._buffered(w,self.crossing_headway_seconds)
-                for other in self.edges.values():
-                    if other.edge_id!=edge.edge_id and other.crossing_group==edge.crossing_group:
-                        blockers.extend(u for _,u in self._reservations[other.edge_id] if cross.overlaps(u))
+            blockers=self._blockers(edge,w)
             if not blockers:return w
             start=max(b.end for b in blockers)+timedelta(seconds=max(self.headway_seconds,self.crossing_headway_seconds))
         raise TaxiConflict("unable to find free surface window")
