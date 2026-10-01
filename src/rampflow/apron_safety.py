@@ -78,9 +78,8 @@ class ApronSafetyMonitor:
         bv=(sin(radians(b.heading_deg))*b.speed_kph/3.6,cos(radians(b.heading_deg))*b.speed_kph/3.6)
         rx=a.x-b.x
         ry=a.y-b.y
-        speed_delta=(a.speed_kph-b.speed_kph)/3.6
-        vx=sin(radians(a.heading_deg))*speed_delta
-        vy=cos(radians(a.heading_deg))*speed_delta
+        vx=av[0]-bv[0]
+        vy=av[1]-bv[1]
         denom=vx*vx+vy*vy
         t=0.0 if denom==0 else max(0.0,min(float(horizon_seconds),-(rx*vx+ry*vy)/denom))
         sep=hypot(rx+vx*t,ry+vy*t)
